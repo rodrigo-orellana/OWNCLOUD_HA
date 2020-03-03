@@ -7,8 +7,6 @@ volumes:
     driver: local
   backup:
     driver: local
-  redis:
-    driver: local
 
 services:
   owncloud:
@@ -16,10 +14,11 @@ services:
     restart: always
     ports:
       - "8080"
-    depends_on:
-      #- ldap
-      - db
-      - redis
+    #depends_on:
+    #  - db
+    networks:
+      - frontend
+      - backend
     environment:
       - OWNCLOUD_DOMAIN=${OWNCLOUD_DOMAIN}
       - OWNCLOUD_DB_TYPE=mysql
@@ -30,8 +29,7 @@ services:
       - OWNCLOUD_ADMIN_USERNAME=${ADMIN_USERNAME}
       - OWNCLOUD_ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - OWNCLOUD_MYSQL_UTF8MB4=true
-      - OWNCLOUD_REDIS_ENABLED=true
-      - OWNCLOUD_REDIS_HOST=redis
+      - OWNCLOUD_REDIS_ENABLED=false
     healthcheck:
       test: ["CMD", "/usr/bin/healthcheck"]
       interval: 30s
@@ -43,6 +41,7 @@ services:
   db:
     image: webhippie/mariadb:latest
     restart: always
+    container_name: mariadb
     environment:
       - MARIADB_ROOT_PASSWORD=owncloud
       - MARIADB_USERNAME=owncloud
@@ -58,36 +57,34 @@ services:
     volumes:
       - mysql:/var/lib/mysql
       - backup:/var/lib/backup
-
-  redis:
-    image: webhippie/redis:latest
-    restart: always
-    environment:
-      - REDIS_DATABASES=1
-    healthcheck:
-      test: ["CMD", "/usr/bin/healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    volumes:
-      - redis:/var/lib/redis
+    networks:
+      - backend
 
   nginx:
     image: nginx:latest
+    container_name: nginx
     volumes:
       - ./nginx_conf/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - owncloud
+    #depends_on:
+    #  - owncloud
+    networks:
+      - frontend
     ports:
       - "80:80"
 
   ldap:
     image: larrycai/openldap
-    #volumes:
-      #- /var/lib/ldap
-      #- /etc/ldap/slapd.d
-      #- /container/service/slapd/assets/certs/
-    depends_on:
-      - owncloud
+    container_name: ldap
+    #depends_on:
+    #  - owncloud
     ports:
       - "389"
+    networks:
+      - backend
+networks:
+  frontend:
+    # Use a custom driver
+    #driver: default
+  backend:
+    # Use a custom driver
+    #driver: default
